@@ -238,6 +238,33 @@ class QuoteFlowTest {
     }
 
     @Test
+    void templatesArePaginatedAndSoftDeleted() throws Exception {
+        long mat = materialWithPrices("sac", "sac", "4800", "5000", "5200");
+        String tag = "tpl-" + uid();
+        long[] ids = new long[3];
+        for (int i = 0; i < 3; i++)
+            ids[i] = id(create("/api/quote-templates", "{\"name\":\"" + tag + "-" + i + "\",\"items\":[{\"materialId\":" + mat + ",\"quantity\":2}]}"));
+        mvc.perform(get("/api/quote-templates?q=" + tag + "&size=2&sort=name,desc"))
+                .andExpect(jsonPath("$.content.length()").value(2)).andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2)).andExpect(jsonPath("$.content[0].name").value(tag + "-2"));
+        mvc.perform(get("/api/quote-templates?sort=bogus")).andExpect(status().isBadRequest());
+
+        mvc.perform(delete("/api/quote-templates/" + ids[0])).andExpect(status().isNoContent());
+        mvc.perform(get("/api/quote-templates?q=" + tag)).andExpect(jsonPath("$.totalElements").value(2));
+        mvc.perform(delete("/api/quote-templates/" + ids[0])).andExpect(status().isNotFound());
+        // le nom est de nouveau disponible
+        create("/api/quote-templates", "{\"name\":\"" + tag + "-0\",\"items\":[{\"materialId\":" + mat + ",\"quantity\":1}]}");
+    }
+
+    @Test
+    void draftQuoteIsSoftDeleted() throws Exception {
+        long qid = id(quote(materialWithPrices("sac", "sac", "4800", "5000", "5200"), ""));
+        mvc.perform(delete("/api/quotes/" + qid)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/quotes/" + qid)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/quotes/" + qid + "/pdf")).andExpect(status().isNotFound());
+    }
+
+    @Test
     void emptyDraftCannotBeIssued() throws Exception {
         String q = quote(materialWithPrices("sac", "sac", "4800", "5000", "5200"), "");
         long qid = id(q);

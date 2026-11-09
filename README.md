@@ -82,7 +82,7 @@ Réponse : `{content, page, size, totalElements, totalPages}`.
 | Prix d'un matériau | `GET /materials/{id}/prices` (historique), `GET /materials/{id}/price-resolution?locality=&date=&sourceType=` |
 | Taxes | `GET/POST /tax-rates`, `POST /tax-rates/{code}/validate` |
 | Devis | `POST/GET /quotes`, `GET/PUT/DELETE /quotes/{id}`, `POST /quotes/{id}/lines`, `PUT/DELETE /quotes/{id}/lines/{lineId}`, `POST /quotes/{id}/reprice`, `POST /quotes/{id}/issue` |
-| Modèles | `GET/POST /quote-templates`, `DELETE /quote-templates/{id}`, `POST /quote-templates/{id}/quotes` |
+| Modèles | `GET/POST /quote-templates` (liste paginée, tri `id`/`name`, `q` sur le nom), `DELETE /quote-templates/{id}`, `POST /quote-templates/{id}/quotes` |
 | Exports | `GET /quotes/{id}/pdf`, `GET /quotes/{id}/docx` |
 
 Erreurs RFC 9457 : 400 validation, 404 introuvable, 409 doublon/référence/modification concurrente, 422 règle métier
@@ -111,6 +111,7 @@ pour le transport. Les taux utilisés, leurs bases et montants sont figés dans 
 Ordre : lignes → sous-total → remise (avant taxe) → transport (non remisé) → taxes par taux → TTC.
 
 ## Devis
+La suppression d'un brouillon (`DELETE /quotes/{id}`) et celle d'un modèle sont **douces** : la ligne reste en base (`deleted_at`) avec ses lignes et son historique, mais n'apparaît plus dans l'API (404). Il n'existe pas de restauration par l'API. Le nom d'un modèle supprimé est suffixé pour être de nouveau utilisable.
 `DRAFT` : modifiable (en-tête, lignes, quantités, `reprice`). `ISSUED` : immuable. Historique des statuts dans `history`.
 `reprice` re-sélectionne les prix des lignes catalogue (prix manuels conservés) ; sans cet appel, un brouillon garde ses prix figés.
 
@@ -129,6 +130,6 @@ PostgreSQL est la seule base (H2 sert uniquement aux tests) ; `sqlite-jdbc` rest
 
 ## Migrations
 `V1__init` (schéma de base), `V2__price_observations` (observations, conversions d'unités, caractéristiques ; remplace `price_entries`),
-`V3__taxes_and_quote_snapshots` (taxes, snapshots de devis, historique), `db/demo/V900__demo_catalog` (profil demo).
+`V3__taxes_and_quote_snapshots` (taxes, snapshots de devis, historique), `V4__soft_delete` (colonne `deleted_at`), `db/demo/V900__demo_catalog` (profil demo).
 
 Voir `docs/ARCHITECTURE.md` pour l'architecture, les diagrammes et les garanties ACID.

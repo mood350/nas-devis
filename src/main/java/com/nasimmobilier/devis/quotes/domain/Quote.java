@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -20,6 +21,7 @@ import java.util.List;
  */
 @Entity
 @Table(name = "quotes")
+@SQLRestriction("deleted_at is null")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Quote {
@@ -76,6 +78,8 @@ public class Quote {
     private BigDecimal taxTotal = BigDecimal.ZERO;
     @Column(nullable = false)
     private BigDecimal totalTtc = BigDecimal.ZERO;
+    private LocalDateTime deletedAt;
+
     @Version
     private Long version;
     @Column(nullable = false)
@@ -198,5 +202,11 @@ public class Quote {
 
     private void requireDraft() {
         if (status != Status.DRAFT) throw new BusinessRuleException("Un devis emis est immuable");
+    }
+
+    /** Suppression douce d'un brouillon ; lignes, taxes et historique sont conserves. */
+    public void softDelete() {
+        if (status != Status.DRAFT) throw new BusinessRuleException("Un devis emis ne peut pas etre supprime");
+        deletedAt = LocalDateTime.now();
     }
 }
