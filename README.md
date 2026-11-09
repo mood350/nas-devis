@@ -8,10 +8,10 @@ des prix (médiane), devis éditables, exports PDF (Thymeleaf + OpenHTMLtoPDF) e
 
 ## Lancement
 ```
-cp .env.example .env            # puis ajuster (jamais committé : .env est dans .gitignore)
+cp .env.example .env            # puis renseigner DB_PASSWORD (jamais committé : .env est dans .gitignore)
 docker compose up --build       # PostgreSQL 16 + application sur http://localhost:8080
 ```
-Sans Docker : un PostgreSQL accessible via `DB_URL` / `DB_USER` / `DB_PASSWORD`, puis `./mvnw spring-boot:run`.
+Sans Docker : un PostgreSQL accessible via `DB_URL` (optionnel), `DB_USER` et `DB_PASSWORD` (**obligatoires**, aucune valeur par défaut), puis `./mvnw spring-boot:run`.
 Swagger UI : http://localhost:8080/swagger-ui.html - OpenAPI : `/v3/api-docs`.
 
 **Données de démonstration** (catalogue fictif : ciment, fers Ø8-16, sable, gravier, parpaings, coffrage, PVC, câbles) :

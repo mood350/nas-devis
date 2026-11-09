@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: nasimmobilier
       POSTGRES_USER: nasim
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-nasim}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD est requis (voir .env.example)}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -19,7 +19,7 @@ services:
     environment:
       DB_URL: jdbc:postgresql://db:5432/nasimmobilier
       DB_USER: nasim
-      DB_PASSWORD: ${DB_PASSWORD:-nasim}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD est requis (voir .env.example)}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
     ports:
       - "8080:8080"
