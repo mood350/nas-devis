@@ -7,15 +7,19 @@ import com.nasimmobilier.devis.quotes.application.QuoteService.QuoteResponse;
 import com.nasimmobilier.devis.quotes.domain.QuoteTemplate;
 import com.nasimmobilier.devis.quotes.domain.QuoteTemplateRepository;
 import com.nasimmobilier.devis.shared.NotFoundException;
+import com.nasimmobilier.devis.shared.PageQuery;
+import com.nasimmobilier.devis.shared.PageResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -57,12 +61,13 @@ public class QuoteTemplateService {
     }
 
     @Transactional(readOnly = true)
-    public List<TemplateResponse> list() {
-        return repository.findAllByOrderByName().stream().map(this::toResponse).toList();
+    public PageResponse<TemplateResponse> list(PageQuery pq) {
+        return PageResponse.of(repository.findByNameContainingIgnoreCase(pq.search(),
+                pq.pageable(Set.of("id", "name"), Sort.by("name"))), this::toResponse);
     }
 
     public void delete(Long id) {
-        repository.delete(repository.findById(id).orElseThrow(() -> new NotFoundException("Modele", id)));
+        repository.findById(id).orElseThrow(() -> new NotFoundException("Modele", id)).softDelete();
     }
 
     /** Instancie le modele aux prix resolus aujourd'hui, dans une seule transaction. */

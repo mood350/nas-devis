@@ -161,9 +161,7 @@ public class QuoteService {
     }
 
     public void delete(Long id) {
-        Quote q = repository.findById(id).orElseThrow(() -> new NotFoundException("Devis", id));
-        if (q.getStatus() != Quote.Status.DRAFT) throw new BusinessRuleException("Un devis emis ne peut pas etre supprime");
-        repository.delete(q);
+        repository.findById(id).orElseThrow(() -> new NotFoundException("Devis", id)).softDelete();
     }
 
     private Quote find(Long id) {

@@ -5,11 +5,14 @@ import com.nasimmobilier.devis.quotes.application.QuoteTemplateService;
 import com.nasimmobilier.devis.quotes.application.QuoteTemplateService.FromTemplateRequest;
 import com.nasimmobilier.devis.quotes.application.QuoteTemplateService.TemplateRequest;
 import com.nasimmobilier.devis.quotes.application.QuoteTemplateService.TemplateResponse;
+import com.nasimmobilier.devis.shared.PageQuery;
+import com.nasimmobilier.devis.shared.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,9 +27,9 @@ public class QuoteTemplateController {
     private final QuoteTemplateService service;
 
     @GetMapping
-    @Operation(summary = "Lister les modeles")
-    public List<TemplateResponse> list() {
-        return service.list();
+    @Operation(summary = "Lister les modeles (pagine)", description = "Tri autorise : id, name. q = recherche sur le nom.")
+    public PageResponse<TemplateResponse> list(@ParameterObject PageQuery pq) {
+        return service.list(pq);
     }
 
     @PostMapping
@@ -40,7 +43,7 @@ public class QuoteTemplateController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Supprimer un modele")
+    @Operation(summary = "Supprimer un modele (suppression douce)")
     public void delete(@PathVariable Long id) {
         service.delete(id);
     }

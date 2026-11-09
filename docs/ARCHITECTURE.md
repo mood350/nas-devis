@@ -80,6 +80,9 @@ Aucun taux n'est jamais supposé. Un taux (`tax_rates`) doit être créé puis v
 - Les exports PDF/DOCX ne s'exécutent pas dans une transaction : le devis est lu dans une transaction `readOnly` courte, puis rendu hors transaction.
 - Contraintes SQL : `CHECK` (quantités, prix, pourcentages, statuts), `UNIQUE`, clés étrangères, index de recherche.
 
+## Suppression douce
+`quotes` et `quote_templates` portent `deleted_at` (migration V4) ; `@SQLRestriction("deleted_at is null")` masque ces lignes dans toutes les requêtes JPA. Seul un devis `DRAFT` peut être supprimé ; les enfants (lignes, taxes, historique) ne sont pas touchés.
+
 ## Statuts d'un devis
 
 ```mermaid
@@ -104,5 +107,5 @@ chaque PR vers `main`.
 (sans lui, Spring conserve le texte littéral `${DB_USER}`).
 
 ## Non fait / limites
-- Suppression douce, pagination de la liste des modèles de devis, signature électronique, envoi par mail.
+- Signature électronique, envoi par mail, restauration d'éléments supprimés. La suppression douce ne couvre que les devis brouillon et les modèles (pas catalogue, fournisseurs, etc.).
 - Le logo n'est pas snapshotté.
