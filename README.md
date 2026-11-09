@@ -7,12 +7,45 @@ des prix (médiane), devis éditables, exports PDF (Thymeleaf + OpenHTMLtoPDF) e
 > Tous les endpoints sont ouverts. Ne pas exposer ce service tel quel sur Internet.
 
 ## Lancement
+Les variables `DB_USER` et `DB_PASSWORD` sont **obligatoires** (aucune valeur par défaut). Si l'une est absente ou vide,
+l'application s'arrête au démarrage avec un message qui nomme la variable manquante.
+
+### Avec Docker Compose
 ```
 cp .env.example .env            # puis renseigner DB_PASSWORD (jamais committé : .env est dans .gitignore)
 docker compose up --build       # PostgreSQL 16 + application sur http://localhost:8080
 ```
-Sans Docker : un PostgreSQL accessible via `DB_URL` (optionnel), `DB_USER` et `DB_PASSWORD` (**obligatoires**, aucune valeur par défaut), puis `./mvnw spring-boot:run`.
+Le fichier `.env` est lu **par Docker Compose** pour renseigner les `${...}` de `docker-compose.yml`. Le compose force
+`DB_USER=nasim` et `DB_URL` vers le conteneur `db`.
+
+### Depuis IntelliJ IDEA (ou `./mvnw spring-boot:run`)
+Spring Boot **ne charge pas** le fichier `.env`. Dans IntelliJ : *Run → Edit Configurations → NasimmobilierApplication →
+Environment variables* (activer le champ via *Modify options* si besoin) :
+```
+DB_USER=mon_user;DB_PASSWORD=mon_mot_de_passe;DB_URL=jdbc:postgresql://localhost:5432/nasimmobilier
+```
+Avec Maven en terminal, exporter les variables dans le shell avant `./mvnw spring-boot:run`. Il faut un PostgreSQL local
+dont la base existe déjà (Flyway crée les tables, pas la base).
+
 Swagger UI : http://localhost:8080/swagger-ui.html - OpenAPI : `/v3/api-docs`.
+
+### Variables d'environnement
+| Variable | Rôle | Obligatoire | Exemple / défaut |
+|---|---|---|---|
+| `DB_USER` | utilisateur PostgreSQL | **oui** | `nasim` |
+| `DB_PASSWORD` | mot de passe PostgreSQL | **oui** | (secret, à ne jamais committer) |
+| `DB_URL` | URL JDBC | non | `jdbc:postgresql://localhost:5432/nasimmobilier` |
+| `COMPANY_NAME` / `COMPANY_ADDRESS` | identité sur les devis | non | `NASIM IMMOBILIER` / `Lome, Togo` |
+| `COMPANY_NIF` / `COMPANY_PHONE` / `COMPANY_EMAIL` | mentions légales et contact sur les devis | non | vides par défaut |
+| `COMPANY_LOGO` | logo (ressource Spring) | non | `classpath:logo.png` (placeholder à remplacer) |
+| `PRICING_MAX_AGE_DAYS` | âge max d'une observation de prix | non | `90` |
+| `PRICING_MIN_OBSERVATIONS` | observations minimales pour un prix | non | `2` |
+| `PRICING_REQUIRE_SAME_LOCALITY` | exiger la même localité | non | `true` |
+| `QUOTE_MAX_DISCOUNT_PERCENT` | remise maximale d'un devis (%) | non | `100` |
+| `SPRING_PROFILES_ACTIVE` | `demo` charge le catalogue fictif | non | vide |
+
+Les autres propriétés `app.pricing.*` (`include-demo`, `high-confidence-*`) se règlent dans `application.properties`
+(voir « Règles de prix »).
 
 **Données de démonstration** (catalogue fictif : ciment, fers Ø8-16, sable, gravier, parpaings, coffrage, PVC, câbles) :
 `SPRING_PROFILES_ACTIVE=demo`. Tous les prix sont **fictifs** (`demo = true`) ; les devis qui les utilisent sont marqués
@@ -28,9 +61,13 @@ Swagger UI : http://localhost:8080/swagger-ui.html - OpenAPI : `/v3/api-docs`.
 | `QuoteFlowTest` | API complète sur H2 : taxes, PRICE_UNAVAILABLE, conversion d'unités, édition de brouillon, immutabilité, pagination, PDF (multipage, accents) et DOCX, Swagger |
 | `DemoCatalogTest` | profil demo |
 | `QuoteDbContractH2Test` | transactions, rollback, verrou optimiste, numérotation concurrente, contraintes SQL, snapshots, sur H2 (mode PostgreSQL) |
-| `QuoteDbContractPostgresTest` | **même contrat sur un vrai PostgreSQL 16 (Testcontainers)**. Ignoré automatiquement si Docker est absent |
+| `QuoteDbContractPostgresTest` | **même contrat (6 tests) sur un vrai PostgreSQL 16 via Testcontainers** |
+| `DatabaseCredentialsCheckTest` | échec du démarrage si `DB_USER` / `DB_PASSWORD` sont absents ou vides |
 
-> Sans Docker, la compatibilité PostgreSQL **n'est pas vérifiée** : seul H2 est exercé. Voir « État de la vérification » ci-dessous.
+**Tests PostgreSQL (Testcontainers)** : ils s'exécutent dès qu'un Docker est joignable, en local comme en CI. Sans Docker
+local ils sont **ignorés** (`disabledWithoutDocker = true`) : Maven les affiche alors comme « skipped » et seul H2 est exercé.
+Le workflow GitHub Actions (`.github/workflows/ci.yml`, job `build`, `ubuntu-latest` où Docker est présent) lance
+`./mvnw -B clean verify` à chaque PR vers `main`, donc ces 6 tests y tournent ; le job `build` est exigé avant fusion.
 
 ## Endpoints (préfixe `/api`)
 Toutes les listes sont paginées : `page`, `size` (1-100), `sort=champ,asc|desc` (liste blanche, sinon 400), `q` (recherche).
@@ -88,7 +125,7 @@ Ordre : lignes → sous-total → remise (avant taxe) → transport (non remisé
 | testcontainers-postgresql, testcontainers-junit-jupiter (test) | tests sur PostgreSQL réel |
 
 Spring Boot 4.1.2 avec springdoc 3.2.0.
-PostgreSQL est la seule base ; `sqlite-jdbc` reste dans le POM sans être configuré. `spring-boot-starter-mail` est conservé, sans envoi de mail.
+PostgreSQL est la seule base (H2 sert uniquement aux tests) ; `sqlite-jdbc` reste dans le POM sans être configuré. `spring-boot-starter-mail` est conservé, sans envoi de mail.
 
 ## Migrations
 `V1__init` (schéma de base), `V2__price_observations` (observations, conversions d'unités, caractéristiques ; remplace `price_entries`),

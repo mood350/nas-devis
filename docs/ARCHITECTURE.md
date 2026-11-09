@@ -94,7 +94,15 @@ stateDiagram-v2
 ## Exports
 PDF A4 : Thymeleaf (`templates/quotes/quote.html`) → OpenHTMLtoPDF ; en-tête de tableau répété sur chaque page, numérotation « Page x / y », logo, signature et cachet. DOCX : Apache POI, vrais tableaux Word (en-tête répété). Les deux sont dérivés du seul `QuoteResponse` (snapshot) ; seul le logo est relu à l'export.
 
+## Tests PostgreSQL
+`QuoteDbContractPostgresTest` (6 tests, Testcontainers, PostgreSQL 16) rejoue le contrat de `QuoteDbContractTest` sur un vrai
+PostgreSQL. Exécuté si Docker est joignable (local ou CI), ignoré sinon. Le job `build` de GitHub Actions les exécute à
+chaque PR vers `main`.
+
+## Démarrage
+`DatabaseCredentialsCheck` refuse de démarrer si `DB_USER`/`DB_PASSWORD` sont absents ou vides pour une URL PostgreSQL
+(sans lui, Spring conserve le texte littéral `${DB_USER}`).
+
 ## Non fait / limites
-- Tests PostgreSQL réels : écrits (`QuoteDbContractPostgresTest`) mais exécutés seulement si Docker est disponible.
 - Suppression douce, pagination de la liste des modèles de devis, signature électronique, envoi par mail.
 - Le logo n'est pas snapshotté.
