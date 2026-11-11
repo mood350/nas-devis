@@ -163,6 +163,7 @@ public class Quote {
         history.add(new QuoteStatusChange(this, Status.DRAFT, Status.ISSUED));
     }
 
+    /** L'annee du numero est celle de la creation du brouillon ; issueDate peut etre posterieure (reinitialisee a l'emission). */
     public void assignNumber() {
         quoteNumber = "DEV-%d-%06d".formatted(issueDate.getYear(), id);
     }

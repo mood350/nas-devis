@@ -130,6 +130,6 @@ PostgreSQL est la seule base (H2 sert uniquement aux tests).
 
 ## Migrations
 `V1__init` (schéma de base), `V2__price_observations` (observations, conversions d'unités, caractéristiques ; remplace `price_entries`),
-`V3__taxes_and_quote_snapshots` (taxes, snapshots de devis, historique), `V4__soft_delete` (colonne `deleted_at`), `db/demo/V900__demo_catalog` (profil demo).
+`V3__taxes_and_quote_snapshots` (taxes, snapshots de devis, historique), `V4__soft_delete` (colonne `deleted_at`), `V5__price_observation_version` (verrou optimiste des observations), `V6__backfill_legacy_quote_totals` (totaux des devis antérieurs à V3), `db/demo/V900__demo_catalog` (profil demo).
 
 Voir `docs/ARCHITECTURE.md` pour l'architecture, les diagrammes et les garanties ACID.
