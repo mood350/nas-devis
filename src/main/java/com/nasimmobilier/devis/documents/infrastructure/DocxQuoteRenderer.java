@@ -117,14 +117,14 @@ public class DocxQuoteRenderer {
         r.setFontSize(10);
         String[] parts = text.split("\n", -1);
         for (int i = 0; i < parts.length; i++) {
-            r.setText(parts[i]);
+            r.setText(XmlChars.clean(parts[i]));
             if (i < parts.length - 1) r.addBreak();
         }
     }
 
     private static void run(XWPFParagraph p, String text, boolean bold, int size) {
         XWPFRun r = p.createRun();
-        r.setText(text);
+        r.setText(XmlChars.clean(text));
         r.setBold(bold);
         r.setFontSize(size);
     }
