@@ -24,7 +24,7 @@ public class PdfQuoteRenderer {
         Context ctx = new Context(Locale.FRANCE);
         ctx.setVariable("quote", quote);
         ctx.setVariable("logo", logo.bytes().map(b -> "data:image/png;base64," + Base64.getEncoder().encodeToString(b)).orElse(null));
-        String html = templateEngine.process("quotes/quote", ctx);
+        String html = XmlChars.clean(templateEngine.process("quotes/quote", ctx));
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PdfRendererBuilder b = new PdfRendererBuilder();
             b.useFastMode();

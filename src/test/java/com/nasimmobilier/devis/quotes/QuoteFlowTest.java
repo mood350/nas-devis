@@ -383,6 +383,40 @@ class QuoteFlowTest {
     }
 
     @Test
+    void controlCharactersInTextDoNotBreakTheExportsOfAnIssuedQuote() throws Exception {
+        String vt = "\\" + "u000b"; // echappement JSON d'une tabulation verticale (collee depuis Word)
+        long qid = id(create("/api/quotes", "{\"clientName\":\"K\",\"projectTitle\":\"P\",\"siteLocation\":\"Lomé\",\"lines\":["
+                + "{\"designation\":\"Ciment" + vt + "CPJ\",\"unit\":\"f\",\"quantity\":1,\"unitPrice\":10}]}"));
+        mvc.perform(post("/api/quotes/" + qid + "/issue")).andExpect(status().isOk()); // immuable : plus de correction possible
+        byte[] pdf = mvc.perform(get("/api/quotes/" + qid + "/pdf")).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        try (PDDocument doc = PDDocument.load(pdf)) {
+            assertTrue(new PDFTextStripper().getText(doc).contains("CimentCPJ"));
+        }
+        byte[] docx = mvc.perform(get("/api/quotes/" + qid + "/docx")).andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(docx))) {
+            assertEquals("CimentCPJ", doc.getTables().get(1).getRow(1).getTableCells().get(1).getText());
+        }
+    }
+
+    @Test
+    void partialHeaderUpdateKeepsDiscountTransportValidityAndAddress() throws Exception {
+        String q = create("/api/quotes", "{\"clientName\":\"K\",\"clientAddress\":\"Adidogomé\",\"projectTitle\":\"P\",\"siteLocation\":\"Lomé\","
+                + "\"validityDays\":60,\"discountPercent\":10,\"transportCost\":25000,\"lines\":[" + MANUAL_LINE + "]}");
+        long qid = id(q);
+        double total = ((Number) JsonPath.read(q, "$.totalTtc")).doubleValue();
+        mvc.perform(put("/api/quotes/" + qid).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"clientName\":\"Nouveau\",\"projectTitle\":\"P\",\"siteLocation\":\"Lomé\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.clientName").value("Nouveau"))
+                .andExpect(jsonPath("$.clientAddress").value("Adidogomé")).andExpect(jsonPath("$.validityDays").value(60))
+                .andExpect(jsonPath("$.discountPercent").value(10)).andExpect(jsonPath("$.transportCost").value(25000))
+                .andExpect(jsonPath("$.totalTtc").value(total));
+        // valeur explicite : prise en compte
+        mvc.perform(put("/api/quotes/" + qid).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"clientName\":\"Nouveau\",\"projectTitle\":\"P\",\"siteLocation\":\"Lomé\",\"discountPercent\":0,\"transportCost\":0}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.discountPercent").value(0)).andExpect(jsonPath("$.transportCost").value(0));
+    }
+
+    @Test
     void templatesArePaginatedAndSoftDeleted() throws Exception {
         long mat = materialWithPrices("sac", "sac", "4800", "5000", "5200");
         String tag = "tpl-" + uid();
