@@ -1,136 +1,174 @@
-# Nasim Immobilier - Microservice de devis BTP
+# Nasim Immobilier — devis BTP
 
-Backend Spring Boot 4.1.2 / Java 21 : catalogue de matériaux, fournisseurs, observations de prix, moteur de sélection
-des prix (médiane), devis éditables, exports PDF (Thymeleaf + OpenHTMLtoPDF) et DOCX (Apache POI).
+Un service web (API) pour **préparer des devis de chantier**.
+Vous gardez un catalogue de matériaux et les prix relevés chez vos fournisseurs. Le service choisit un prix fiable, calcule la remise, les taxes et le total, puis exporte le devis en **PDF** ou en **Word (DOCX)**.
 
-> **Sécurité : l'authentification et l'autorisation ne sont PAS encore implémentées.**
-> Tous les endpoints sont ouverts. Ne pas exposer ce service tel quel sur Internet.
+> ⚠️ **Pas d'authentification.** Tous les endpoints sont ouverts : n'exposez pas ce service tel quel sur Internet.
 
-## Lancement
-Les variables `DB_USER` et `DB_PASSWORD` sont **obligatoires** (aucune valeur par défaut). Si l'une est absente ou vide,
-l'application s'arrête au démarrage avec un message qui nomme la variable manquante.
+**Sommaire** : [Démarrer](#démarrer-en-3-minutes) · [Premier devis](#votre-premier-devis) · [Comment ça marche](#comment-ça-marche) · [Endpoints](#endpoints) · [Configuration](#configuration) · [Développer et tester](#développer-et-tester)
 
-### Avec Docker Compose
+---
+
+## Démarrer en 3 minutes
+
+Il faut seulement [Docker](https://docs.docker.com/get-docker/).
+
+```bash
+cp .env.example .env        # puis ouvrez .env et choisissez un mot de passe : DB_PASSWORD=...
+docker compose up --build   # PostgreSQL + l'application
 ```
-cp .env.example .env            # puis renseigner DB_PASSWORD (jamais committé : .env est dans .gitignore)
-docker compose up --build       # PostgreSQL 16 + application sur http://localhost:8080
+
+Ouvrez ensuite **http://localhost:8080/swagger-ui.html** : c'est une page où l'on voit tous les endpoints et où l'on peut les essayer (bouton *Try it out*).
+
+**Envie d'essayer avec des données ?** Dans `.env`, mettez `SPRING_PROFILES_ACTIVE=demo`. Un catalogue **fictif** est alors chargé (ciment, fers, sable, gravier, parpaings, PVC, câbles). Les devis qui utilisent ces prix portent la mention « DOCUMENT DE DÉMONSTRATION » et **ne peuvent pas être émis**.
+
+---
+
+## Votre premier devis
+
+### Le plus simple : des lignes saisies à la main
+
+```bash
+curl -X POST http://localhost:8080/api/quotes -H "Content-Type: application/json" -d '{
+  "clientName": "M. Koffi Agbodjan",
+  "projectTitle": "Mur de cloture",
+  "siteLocation": "Lome",
+  "lines": [
+    { "designation": "Main d oeuvre macon", "unit": "f", "quantity": 1, "unitPrice": 5000 }
+  ]
+}'
 ```
-Le fichier `.env` est lu **par Docker Compose** pour renseigner les `${...}` de `docker-compose.yml`. Le compose force
-`DB_USER=nasim` et `DB_URL` vers le conteneur `db`.
 
-### Depuis IntelliJ IDEA (ou `./mvnw spring-boot:run`)
-Spring Boot **ne charge pas** le fichier `.env`. Dans IntelliJ : *Run → Edit Configurations → NasimmobilierApplication →
-Environment variables* (activer le champ via *Modify options* si besoin) :
-```
-DB_USER=mon_user;DB_PASSWORD=mon_mot_de_passe;DB_URL=jdbc:postgresql://localhost:5432/nasimmobilier
-```
-Avec Maven en terminal, exporter les variables dans le shell avant `./mvnw spring-boot:run`. Il faut un PostgreSQL local
-dont la base existe déjà (Flyway crée les tables, pas la base).
+> Sous Windows, un terminal peut mal envoyer les accents (erreur `400`) : l'exemple n'en contient pas. Pour des textes accentués, utilisez plutôt Swagger UI.
 
-Swagger UI : http://localhost:8080/swagger-ui.html - OpenAPI : `/v3/api-docs`.
+La réponse contient l'`id` du devis, son numéro (`DEV-2026-000001`) et le total. Avec cet `id` (ici `1`) :
 
-### Variables d'environnement
-| Variable | Rôle | Obligatoire | Exemple / défaut |
-|---|---|---|---|
-| `DB_USER` | utilisateur PostgreSQL | **oui** | `nasim` |
-| `DB_PASSWORD` | mot de passe PostgreSQL | **oui** | (secret, à ne jamais committer) |
-| `DB_URL` | URL JDBC | non | `jdbc:postgresql://localhost:5432/nasimmobilier` |
-| `COMPANY_NAME` / `COMPANY_ADDRESS` | identité sur les devis | non | `NASIM IMMOBILIER` / `Lome, Togo` |
-| `COMPANY_NIF` / `COMPANY_PHONE` / `COMPANY_EMAIL` | mentions légales et contact sur les devis | non | vides par défaut |
-| `COMPANY_LOGO` | logo (ressource Spring) | non | `classpath:logo.png` (placeholder à remplacer) |
-| `PRICING_MAX_AGE_DAYS` | âge max d'une observation de prix | non | `90` |
-| `PRICING_MIN_OBSERVATIONS` | observations minimales pour un prix | non | `2` |
-| `PRICING_REQUIRE_SAME_LOCALITY` | exiger la même localité | non | `true` |
-| `QUOTE_MAX_DISCOUNT_PERCENT` | remise maximale d'un devis (%) | non | `100` |
-| `SPRING_PROFILES_ACTIVE` | `demo` charge le catalogue fictif | non | vide |
-
-Les autres propriétés `app.pricing.*` (`include-demo`, `high-confidence-*`) se règlent dans `application.properties`
-(voir « Règles de prix »).
-
-**Données de démonstration** (catalogue fictif : ciment, fers Ø8-16, sable, gravier, parpaings, coffrage, PVC, câbles) :
-`SPRING_PROFILES_ACTIVE=demo`. Tous les prix sont **fictifs** (`demo = true`) ; les devis qui les utilisent sont marqués
-« DOCUMENT DE DÉMONSTRATION » et **ne peuvent pas être émis**. Sans ce profil, aucune donnée de démonstration n'existe.
-
-## Tests
-```
-./mvnw clean verify
-```
-| Suite | Cible |
+| Je veux… | J'ouvre / j'appelle |
 |---|---|
-| `PricingEngineTest`, `PriceSelectorTest` | calcul et sélection des prix (purs) |
-| `QuoteFlowTest` | API complète sur H2 : taxes, PRICE_UNAVAILABLE, conversion d'unités, édition de brouillon, immutabilité, pagination, PDF (multipage, accents) et DOCX, Swagger |
-| `DemoCatalogTest` | profil demo |
-| `QuoteDbContractH2Test` | transactions, rollback, verrou optimiste, numérotation concurrente, contraintes SQL, snapshots, sur H2 (mode PostgreSQL) |
-| `QuoteDbContractPostgresTest` | **même contrat (6 tests) sur un vrai PostgreSQL 16 via Testcontainers** |
-| `DatabaseCredentialsCheckTest` | échec du démarrage si `DB_USER` / `DB_PASSWORD` sont absents ou vides |
+| télécharger le PDF | http://localhost:8080/api/quotes/1/pdf (dans le navigateur) |
+| télécharger le Word | http://localhost:8080/api/quotes/1/docx |
+| ajouter une ligne | `POST /api/quotes/1/lines` |
+| **émettre** le devis (il ne sera plus modifiable) | `POST /api/quotes/1/issue` |
 
-**Tests PostgreSQL (Testcontainers)** : ils s'exécutent dès qu'un Docker est joignable, en local comme en CI. Sans Docker
-local ils sont **ignorés** (`disabledWithoutDocker = true`) : Maven les affiche alors comme « skipped » et seul H2 est exercé.
-Le workflow GitHub Actions (`.github/workflows/ci.yml`, job `build`, `ubuntu-latest` où Docker est présent) lance
-`./mvnw -B clean verify` à chaque PR vers `main`, donc ces 6 tests y tournent ; le job `build` est exigé avant fusion.
+> Aucune taxe n'est appliquée tant que vous n'en avez pas créé une (voir [Taxes](#taxes)).
 
-## Endpoints (préfixe `/api`)
-Toutes les listes sont paginées : `page`, `size` (1-100), `sort=champ,asc|desc` (liste blanche, sinon 400), `q` (recherche).
-Réponse : `{content, page, size, totalElements, totalPages}`.
+### Avec les prix du catalogue
+
+Au lieu de `designation` / `unit` / `unitPrice`, une ligne peut désigner un matériau : `{ "materialId": 3, "quantity": 10 }`. Le service retrouve alors le prix tout seul, à partir des relevés de prix validés (voir [Prix](#le-prix-dun-matériau)).
+
+Avec le profil `demo`, cherchez un matériau (`GET /api/materials?q=ciment`), notez son `id`, et utilisez-le dans une ligne.
+
+---
+
+## Comment ça marche
+
+```
+ Matériaux ──┐
+             ├─►  prix choisi (médiane)  ─►  lignes du devis  ─►  DEVIS BROUILLON  ─►  DEVIS ÉMIS  ─►  PDF / Word
+ Relevés de  ┘    des relevés validés        (copie figée)         modifiable          figé pour toujours
+ prix validés
+```
+
+### Le prix d'un matériau
+Un **relevé de prix** dit : « ce fournisseur vend ce matériau tant, dans cette ville, à cette date ». Un relevé est créé en attente (`PENDING`), puis **validé à la main** (`POST /api/price-observations/{id}/validate`). Seuls les relevés validés comptent.
+
+Le prix d'une ligne est la **médiane** des relevés qui :
+- sont validés, de type `COMMERCIAL`,
+- viennent de la **même ville** que le chantier (`siteLocation`),
+- ont les **mêmes caractéristiques** que le matériau,
+- ont une unité convertible vers celle du matériau,
+- ne sont ni futurs ni vieux de plus de **90 jours**.
+
+Il en faut au moins **2**. Sinon la réponse est une erreur `422` avec `code: PRICE_UNAVAILABLE` : **le service n'invente jamais un prix**. Une confiance accompagne chaque prix :
+
+| Confiance | Quand |
+|---|---|
+| `HIGH` | au moins 3 relevés, au moins 2 fournisseurs, écart max/min ≤ 25 % de la médiane |
+| `MEDIUM` | au moins 2 relevés venant d'au moins 2 fournisseurs |
+| `LOW` | le reste (par exemple un seul fournisseur) |
+
+Les prix `ADMINISTRATIVE_REFERENCE` (barèmes officiels) sont gardés à part et ne sont **jamais mélangés** aux prix commerciaux.
+
+**Unités** : si un fournisseur vend en tonnes un matériau compté en kg, déclarez la conversion (`POST /api/unit-conversions` : 1 t = 1000 kg). Le sens inverse est déduit : ne le déclarez pas une seconde fois.
+
+### Les calculs d'un devis
+1. total d'une ligne = quantité × prix unitaire
+2. sous-total HT = somme des lignes
+3. remise (en %) appliquée **avant** la taxe
+4. transport ajouté **après** la remise (jamais remisé)
+5. taxe calculée par taux, sur chaque base
+6. total TTC = net HT + taxes
+
+Tous les montants sont arrondis à 2 décimales et affichés tels quels sur les PDF/Word.
+
+### Taxes
+**Aucun taux n'existe par défaut.** Pour taxer : créer un taux (`POST /api/tax-rates`), le **valider** (`POST /api/tax-rates/{code}/validate`), puis l'indiquer par son code (`taxCode` sur une ligne ou sur tout le devis, `transportTaxCode` pour le transport).
+
+### Vie d'un devis
+- **Brouillon (`DRAFT`)** : on modifie l'en-tête, les lignes et les quantités. Les prix restent figés jusqu'à `POST /quotes/{id}/reprice`, qui recalcule les prix du catalogue (les prix saisis à la main sont conservés). Changer le chantier d'un brouillon refait ce calcul automatiquement.
+- **Émis (`ISSUED`)** : le devis ne change plus jamais, même si le catalogue ou les prix évoluent (le prix, les taxes et l'identité de l'entreprise sont copiés dans le devis).
+- Supprimer un brouillon ou un modèle est une **suppression douce** : il disparaît de l'API mais reste en base.
+- **Deux personnes sur le même brouillon ?** Ajoutez `?version=<la version lue dans le devis>` à une modification ou à l'émission : si quelqu'un est passé avant vous, vous recevez `409` au lieu d'écraser son travail.
+
+### Erreurs
+Format standard (RFC 9457) : `400` requête invalide · `404` introuvable · `409` doublon ou modification simultanée · `422` règle métier non respectée (devis émis, prix indisponible, remise trop forte…).
+
+---
+
+## Endpoints
+
+Tout est sous `/api`. Les listes sont paginées : `page`, `size` (1 à 100), `sort=champ,asc|desc`, `q` (recherche). Pour tout voir et essayer : [Swagger UI](http://localhost:8080/swagger-ui.html).
 
 | Ressource | Endpoints |
 |---|---|
-| Catégories, Fournisseurs, Unités | `GET/POST /categories`, `/suppliers`, `/units` ; `PUT/DELETE /{id}` |
+| Catégories, fournisseurs, unités | `GET/POST /categories`, `/suppliers`, `/units` · `PUT/DELETE /{id}` |
 | Conversions d'unités | `GET/POST /unit-conversions` |
-| Matériaux | `GET /materials` (filtres `categoryId`, `active`, `q`), `GET/PUT /materials/{id}`, `POST /materials` |
-| Observations de prix | `POST/GET /price-observations` (filtres `materialId`, `supplierId`, `locality`, `status`, `sourceType`), `POST /price-observations/{id}/validate`, `/reject` |
-| Prix d'un matériau | `GET /materials/{id}/prices` (historique), `GET /materials/{id}/price-resolution?locality=&date=&sourceType=` |
-| Taxes | `GET/POST /tax-rates`, `POST /tax-rates/{code}/validate` |
-| Devis | `POST/GET /quotes`, `GET/PUT/DELETE /quotes/{id}`, `POST /quotes/{id}/lines`, `PUT/DELETE /quotes/{id}/lines/{lineId}`, `POST /quotes/{id}/reprice`, `POST /quotes/{id}/issue` |
-| Modèles | `GET/POST /quote-templates` (liste paginée, tri `id`/`name`, `q` sur le nom), `DELETE /quote-templates/{id}`, `POST /quote-templates/{id}/quotes` |
-| Exports | `GET /quotes/{id}/pdf`, `GET /quotes/{id}/docx` |
+| Matériaux | `GET/POST /materials` · `GET/PUT /materials/{id}` |
+| Relevés de prix | `GET/POST /price-observations` · `POST /price-observations/{id}/validate` ou `/reject` |
+| Prix d'un matériau | `GET /materials/{id}/price-resolution?locality=Lomé` (prix choisi et explication) · `GET /materials/{id}/prices` (historique) |
+| Taxes | `GET/POST /tax-rates` · `POST /tax-rates/{code}/validate` |
+| Devis | `GET/POST /quotes` · `GET/PUT/DELETE /quotes/{id}` · `POST /quotes/{id}/lines` · `PUT/DELETE /quotes/{id}/lines/{lineId}` · `POST /quotes/{id}/reprice` · `POST /quotes/{id}/issue` |
+| Modèles de devis | `GET/POST /quote-templates` · `DELETE /quote-templates/{id}` · `POST /quote-templates/{id}/quotes` (crée un devis depuis le modèle) |
+| Exports | `GET /quotes/{id}/pdf` · `GET /quotes/{id}/docx` |
 
-Erreurs RFC 9457 : 400 validation, 404 introuvable, 409 doublon/référence/modification concurrente, 422 règle métier
-(`code: PRICE_UNAVAILABLE` quand aucun prix fiable n'existe).
+---
 
-## Règles de prix
-Le prix d'une ligne issue du catalogue est la **médiane** des observations `COMMERCIAL` **validées**, de même localité
-(= « localisation du chantier » du devis), mêmes caractéristiques, unité convertible, non périmées (`max-observation-age-days`,
-90 par défaut), non futures. Si moins de `min-observations` (2) sont retenues : `PRICE_UNAVAILABLE`, jamais de prix inventé.
-Le résultat indique la confiance (`HIGH/MEDIUM/LOW`), les observations utilisées et les exclusions avec leur motif.
-Les prix `ADMINISTRATIVE_REFERENCE` sont stockés séparément et jamais mélangés aux prix commerciaux. Détails et diagramme : `docs/ARCHITECTURE.md`.
+## Configuration
 
-| Propriété | Défaut |
-|---|---|
-| `app.pricing.max-observation-age-days` | 90 |
-| `app.pricing.min-observations` | 2 |
-| `app.pricing.require-same-locality` | true |
-| `app.pricing.include-demo` | false (true avec le profil `demo`) |
-| `app.pricing.high-confidence-min-observations` / `-max-spread-percent` | 3 / 25 |
-| `app.quote.max-discount-percent` | 100 |
+Deux variables sont **obligatoires** : `DB_USER` et `DB_PASSWORD` (aucune valeur par défaut ; sans elles l'application refuse de démarrer et dit laquelle manque). Les autres sont facultatives.
 
-## Fiscalité
-**Aucune taxe n'est appliquée par défaut** et aucun taux n'est préchargé. Créer un taux (`POST /api/tax-rates`), le valider
-(`POST /api/tax-rates/{code}/validate`), puis le référencer explicitement : `taxCode` par ligne ou pour le devis, `transportTaxCode`
-pour le transport. Les taux utilisés, leurs bases et montants sont figés dans le devis. Le devis distingue HT, remise, transport, net HT, taxes, TTC.
-Ordre : lignes → sous-total → remise (avant taxe) → transport (non remisé) → taxes par taux → TTC.
+| Variable | Rôle | Défaut |
+|---|---|---|
+| `DB_USER`, `DB_PASSWORD` | accès à PostgreSQL | **obligatoires** |
+| `DB_URL` | URL JDBC | `jdbc:postgresql://localhost:5432/nasimmobilier` |
+| `COMPANY_NAME`, `COMPANY_ADDRESS`, `COMPANY_PHONE`, `COMPANY_EMAIL`, `COMPANY_NIF` | identité imprimée sur les devis | `NASIM IMMOBILIER`, `Lome, Togo`, vides |
+| `COMPANY_LOGO` | logo PNG | `classpath:logo.png` (un exemple à remplacer) |
+| `PRICING_MAX_AGE_DAYS` | âge maximum d'un relevé de prix | `90` |
+| `PRICING_MIN_OBSERVATIONS` | nombre minimum de relevés | `2` |
+| `PRICING_REQUIRE_SAME_LOCALITY` | exiger la même ville | `true` |
+| `QUOTE_MAX_DISCOUNT_PERCENT` | remise maximale d'un devis (%) | `100` |
+| `SPRING_PROFILES_ACTIVE` | `demo` charge le catalogue fictif | vide |
 
-## Devis
-La suppression d'un brouillon (`DELETE /quotes/{id}`) et celle d'un modèle sont **douces** : la ligne reste en base (`deleted_at`) avec ses lignes et son historique, mais n'apparaît plus dans l'API (404). Il n'existe pas de restauration par l'API. Le nom d'un modèle supprimé est suffixé pour être de nouveau utilisable.
-`DRAFT` : modifiable (en-tête, lignes, quantités, `reprice`). `ISSUED` : immuable. Historique des statuts dans `history`.
-`reprice` re-sélectionne les prix des lignes catalogue (prix manuels conservés) ; sans cet appel, un brouillon garde ses prix figés. Changer le chantier (`siteLocation`) d'un brouillon relance cette sélection automatiquement (tout ou rien : `PRICE_UNAVAILABLE` annule la modification).
-Toute modification d'un brouillon et l'émission acceptent `?version=` (la `version` lue dans le devis) : `409` si le devis a changé depuis. Sans ce paramètre, aucun contrôle.
+**Avec Docker Compose**, ces variables se mettent dans le fichier `.env` (jamais versionné). Le compose fixe lui-même `DB_USER=nasim` et `DB_URL`. L'application tourne sans droits root dans son conteneur, avec un contrôle de santé intégré (`docker ps` affiche `healthy`).
 
-## Dépendances ajoutées (par rapport au POM initial)
-| Dépendance | Raison |
-|---|---|
-| spring-boot-starter-validation | validation des DTO |
-| spring-boot-starter-flyway, flyway-database-postgresql | migrations `db/migration` (`db/demo` pour le profil demo) |
-| poi-ooxml 5.4.1 | export DOCX |
-| openhtmltopdf-pdfbox 1.0.10 | export PDF depuis HTML/CSS |
-| h2 (test) | tests d'intégration sans Docker |
-| testcontainers-postgresql, testcontainers-junit-jupiter (test) | tests sur PostgreSQL réel |
+**Sans Docker** (IntelliJ ou `./mvnw spring-boot:run`) : Spring Boot **ne lit pas** `.env`.
+- IntelliJ : *Run → Edit Configurations → NasimmobilierApplication → Environment variables* : `DB_USER=...;DB_PASSWORD=...`
+- Terminal : exportez les variables avant `./mvnw spring-boot:run`.
 
-Spring Boot 4.1.2 avec springdoc 3.2.0.
-PostgreSQL est la seule base (H2 sert uniquement aux tests).
+Il faut alors un PostgreSQL local dont la base `nasimmobilier` existe déjà (le service crée les tables, pas la base).
 
-## Migrations
-`V1__init` (schéma de base), `V2__price_observations` (observations, conversions d'unités, caractéristiques ; remplace `price_entries`),
-`V3__taxes_and_quote_snapshots` (taxes, snapshots de devis, historique), `V4__soft_delete` (colonne `deleted_at`), `V5__price_observation_version` (verrou optimiste des observations), `V6__backfill_legacy_quote_totals` (totaux des devis antérieurs à V3), `db/demo/V900__demo_catalog` (profil demo).
+---
 
-Voir `docs/ARCHITECTURE.md` pour l'architecture, les diagrammes et les garanties ACID.
+## Développer et tester
+
+```bash
+./mvnw clean verify     # compile et lance tous les tests (c'est ce que fait le CI)
+./mvnw test -Dtest=QuoteFlowTest    # un seul test
+```
+
+- Les tests tournent sur une base H2 en mémoire : aucun Docker nécessaire.
+- 6 tests supplémentaires tournent sur un **vrai PostgreSQL 16** (Testcontainers). Sans Docker ils sont **ignorés** (« skipped ») ; le CI, lui, les exécute.
+- La branche `main` est protégée : passer par une pull request, le contrôle CI `build` doit être vert.
+- Le schéma de la base est géré par des migrations (`src/main/resources/db/migration`). Ne modifiez jamais une migration déjà appliquée : ajoutez-en une nouvelle.
+
+Pour l'architecture, les diagrammes et les garanties de transaction : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
