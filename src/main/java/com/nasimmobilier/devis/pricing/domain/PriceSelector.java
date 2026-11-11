@@ -48,7 +48,7 @@ public final class PriceSelector {
                 : max.subtract(min).multiply(BigDecimal.valueOf(100)).divide(median, 1, RoundingMode.HALF_UP);
         Confidence confidence = kept.size() >= policy.highConfidenceMinObservations() && suppliers >= 2
                 && spread.compareTo(policy.highConfidenceMaxSpreadPercent()) <= 0 ? Confidence.HIGH
-                : kept.size() >= 2 ? Confidence.MEDIUM : Confidence.LOW;
+                : kept.size() >= 2 && suppliers >= 2 ? Confidence.MEDIUM : Confidence.LOW; // un seul fournisseur = une seule source
         boolean demo = kept.stream().anyMatch(Candidate::demo);
         LocalDate oldest = kept.stream().map(Candidate::observedOn).min(Comparator.naturalOrder()).orElseThrow();
         LocalDate newest = kept.stream().map(Candidate::observedOn).max(Comparator.naturalOrder()).orElseThrow();

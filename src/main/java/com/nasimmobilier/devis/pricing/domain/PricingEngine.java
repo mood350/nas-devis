@@ -1,5 +1,7 @@
 package com.nasimmobilier.devis.pricing.domain;
 
+import com.nasimmobilier.devis.shared.BusinessRuleException;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -33,8 +35,16 @@ public final class PricingEngine {
 
     private PricingEngine() {}
 
+    /** Les colonnes sont numeric(15,2) : tout montant doit rester strictement sous 10^13. */
+    private static final BigDecimal MAX_AMOUNT = BigDecimal.TEN.pow(13);
+
     public static BigDecimal lineTotal(BigDecimal quantity, BigDecimal unitPrice) {
-        return quantity.multiply(unitPrice).setScale(2, RoundingMode.HALF_UP);
+        return checked(quantity.multiply(unitPrice).setScale(2, RoundingMode.HALF_UP));
+    }
+
+    private static BigDecimal checked(BigDecimal amount) {
+        if (amount.abs().compareTo(MAX_AMOUNT) >= 0) throw new BusinessRuleException("Montant trop eleve (maximum 9 999 999 999 999,99)");
+        return amount;
     }
 
     private static final class Group {
@@ -69,7 +79,7 @@ public final class PricingEngine {
                 breakdown.add(new TaxBreakdown(e.getKey(), g.label, g.rate, base, tax));
             }
         }
-        return new Totals(subtotal, discount, transport, net, breakdown, taxTotal, net.add(taxTotal));
+        return new Totals(checked(subtotal), discount, transport, checked(net), breakdown, checked(taxTotal), checked(net.add(taxTotal)));
     }
 
     private static Group group(Map<String, Group> groups, Taxed t) {

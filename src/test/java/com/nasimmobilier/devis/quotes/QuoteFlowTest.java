@@ -161,7 +161,7 @@ class QuoteFlowTest {
         ok("/api/price-observations/" + pending + "/validate", "");
         mvc.perform(post("/api/price-observations/" + pending + "/reject")).andExpect(status().isUnprocessableContent());
         mvc.perform(get("/api/materials/" + mat + "/price-resolution?locality=Lomé")).andExpect(jsonPath("$.status").value("OK"))
-                .andExpect(jsonPath("$.confidence").value("MEDIUM"));
+                .andExpect(jsonPath("$.confidence").value("LOW")); // deux observations, un seul fournisseur
         // l'historique conserve tout
         mvc.perform(get("/api/materials/" + mat + "/prices")).andExpect(jsonPath("$.totalElements").value(2));
     }
@@ -235,6 +235,14 @@ class QuoteFlowTest {
         mvc.perform(put("/api/quotes/" + qid).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"clientName\":\"X\",\"projectTitle\":\"Y\",\"siteLocation\":\"Z\"}")).andExpect(status().isUnprocessableContent());
         mvc.perform(delete("/api/quotes/" + qid)).andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void oversizedAmountsAreRejectedWith422NotAConflict() throws Exception {
+        String line = "{\"designation\":\"X\",\"unit\":\"f\",\"quantity\":999999999999,\"unitPrice\":9999999999999}";
+        mvc.perform(post("/api/quotes").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"clientName\":\"K\",\"projectTitle\":\"P\",\"siteLocation\":\"Lomé\",\"lines\":[" + line + "]}"))
+                .andExpect(status().isUnprocessableContent());
     }
 
     @Test

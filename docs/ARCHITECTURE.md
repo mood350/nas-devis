@@ -58,7 +58,7 @@ flowchart TD
 - Observations append-only ; seul le statut évolue (`PENDING → VALIDATED | REJECTED`).
 - Prix par unité du matériau = prix observé ÷ (nombre d'unités du matériau par unité de vente). Conversions : table `unit_conversions`, sens inverse déduit, `t → kg = 1000` migré.
 - Médiane : valeur centrale, ou moyenne des deux centrales si nombre pair ; arrondi HALF_UP à 2 décimales.
-- Confiance : `HIGH` si ≥ `highConfidenceMinObservations`, ≥ 2 fournisseurs et écart (max−min)/médiane ≤ `highConfidenceMaxSpreadPercent` ; `MEDIUM` si ≥ 2 observations ; sinon `LOW`.
+- Confiance : `HIGH` si ≥ `highConfidenceMinObservations`, ≥ 2 fournisseurs et écart (max−min)/médiane ≤ `highConfidenceMaxSpreadPercent` ; `MEDIUM` si ≥ 2 observations de ≥ 2 fournisseurs ; sinon `LOW`.
 - Prix de démonstration (`demo = true`) : utilisables seulement si `app.pricing.include-demo=true` ; la ligne et le devis sont alors marqués, et le devis **ne peut pas être émis**.
 
 ## Calcul d'un devis (`PricingEngine`)

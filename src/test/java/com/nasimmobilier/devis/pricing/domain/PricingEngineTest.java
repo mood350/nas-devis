@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.nasimmobilier.devis.shared.BusinessRuleException;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,6 +29,15 @@ class PricingEngineTest {
     @Test
     void lineTotalRoundsHalfUp() {
         assertEquals(d("4.16"), PricingEngine.lineTotal(d("0.333"), d("12.50")));
+    }
+
+    @Test
+    void amountsBeyondTheColumnSizeAreRejected() {
+        assertThrows(BusinessRuleException.class, () -> PricingEngine.lineTotal(d("999999999999"), d("9999999999999")));
+        // deux lignes valides dont la somme depasse 10^13
+        assertThrows(BusinessRuleException.class, () -> PricingEngine.totals(List.of(untaxed("9000000000000.00"), untaxed("9000000000000.00")),
+                BigDecimal.ZERO, BigDecimal.ZERO, null));
+        assertEquals(d("9999999999999.99"), PricingEngine.lineTotal(d("1"), d("9999999999999.99")));
     }
 
     @Test

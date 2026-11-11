@@ -91,7 +91,7 @@ class PriceSelectorTest {
         assertEquals(Confidence.HIGH, select(List.of(c(1, 1, "4900"), c(2, 2, "5000"), c(3, 3, "5100"))).confidence());
         assertEquals(Confidence.MEDIUM, select(List.of(c(1, 1, "4900"), c(2, 2, "5000"))).confidence());
         assertEquals(Confidence.MEDIUM, select(List.of(c(1, 1, "3000"), c(2, 2, "5000"), c(3, 3, "9000"))).confidence()); // ecart trop grand
-        assertEquals(Confidence.MEDIUM, select(List.of(c(1, 1, "4900"), c(2, 1, "5000"), c(3, 1, "5100"))).confidence()); // un seul fournisseur
+        assertEquals(Confidence.LOW, select(List.of(c(1, 1, "4900"), c(2, 1, "5000"), c(3, 1, "5100"))).confidence()); // un seul fournisseur = une seule source
         var lenient = new Policy(90, 1, true, false, 3, new BigDecimal("25"));
         assertEquals(Confidence.LOW, PriceSelector.select("CPJ 42,5", "Lomé", TODAY, List.of(c(1, 1, "5000")), lenient).confidence());
     }
