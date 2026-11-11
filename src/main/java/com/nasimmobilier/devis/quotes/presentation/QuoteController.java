@@ -89,8 +89,9 @@ public class QuoteController {
     @Operation(summary = "Emettre un devis", description = "Le devis devient immuable. Refuse s'il est vide ou contient des prix DEMO.")
     @ApiResponse(responseCode = "409", description = "Modification concurrente")
     @ApiResponse(responseCode = "422", description = "Deja emis, vide ou prix de demonstration")
-    public QuoteResponse issue(@PathVariable Long id) {
-        return service.issue(id);
+    public QuoteResponse issue(@PathVariable Long id,
+                               @Parameter(description = "Version du devis vue par l'utilisateur ; 409 si le brouillon a change depuis") @RequestParam(required = false) Long version) {
+        return service.issue(id, version);
     }
 
     @DeleteMapping("/{id}")
