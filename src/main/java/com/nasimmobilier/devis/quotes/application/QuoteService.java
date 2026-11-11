@@ -18,6 +18,7 @@ import jakarta.validation.constraints.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -154,8 +155,11 @@ public class QuoteService {
         return flushAndRespond(q);
     }
 
-    public QuoteResponse issue(Long id) {
+    /** version (optionnelle) : celle que l'utilisateur a vue ; si le brouillon a change depuis, HTTP 409. */
+    public QuoteResponse issue(Long id, Long expectedVersion) {
         Quote q = find(id);
+        if (expectedVersion != null && !expectedVersion.equals(q.getVersion()))
+            throw new ObjectOptimisticLockingFailureException(Quote.class, id);
         q.issue();
         return flushAndRespond(q);
     }
