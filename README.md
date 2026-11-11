@@ -126,7 +126,7 @@ La suppression d'un brouillon (`DELETE /quotes/{id}`) et celle d'un modèle sont
 | testcontainers-postgresql, testcontainers-junit-jupiter (test) | tests sur PostgreSQL réel |
 
 Spring Boot 4.1.2 avec springdoc 3.2.0.
-PostgreSQL est la seule base (H2 sert uniquement aux tests) ; `sqlite-jdbc` reste dans le POM sans être configuré. `spring-boot-starter-mail` est conservé, sans envoi de mail.
+PostgreSQL est la seule base (H2 sert uniquement aux tests).
 
 ## Migrations
 `V1__init` (schéma de base), `V2__price_observations` (observations, conversions d'unités, caractéristiques ; remplace `price_entries`),
