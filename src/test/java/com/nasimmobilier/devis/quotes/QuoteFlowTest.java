@@ -246,6 +246,32 @@ class QuoteFlowTest {
     }
 
     @Test
+    void issueWithStaleVersionIsRejectedWith409() throws Exception {
+        long mat = materialWithPrices("sac", "sac", "4800", "5000", "5200");
+        String q = quote(mat, "");
+        long qid = id(q);
+        long line0 = ((Number) JsonPath.read(q, "$.lines[0].id")).longValue();
+        int seen = ((Number) JsonPath.read(q, "$.version")).intValue();
+        // quelqu'un d'autre modifie le brouillon apres notre lecture
+        mvc.perform(put("/api/quotes/" + qid + "/lines/" + line0).contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":20}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/quotes/" + qid + "/issue?version=" + seen)).andExpect(status().isConflict());
+        mvc.perform(get("/api/quotes/" + qid)).andExpect(jsonPath("$.status").value("DRAFT"));
+        int current = ((Number) JsonPath.read(json("/api/quotes/" + qid), "$.version")).intValue();
+        mvc.perform(post("/api/quotes/" + qid + "/issue?version=" + current)).andExpect(jsonPath("$.status").value("ISSUED"));
+    }
+
+    @Test
+    void pendingObservationsDoNotCrowdOutValidatedOnesFromThePriceWindow() throws Exception {
+        long mat = materialWithPrices("sac", "sac", "4800", "5000", "5200");
+        long sup = id(create("/api/suppliers", "{\"name\":\"P-" + uid() + "\"}"));
+        for (int i = 0; i < 205; i++) observe(mat, "" + sup, unitId("sac"), "9999", false); // en attente, plus recentes (id plus grand)
+        mvc.perform(post("/api/quotes").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"clientName\":\"K\",\"projectTitle\":\"P\",\"siteLocation\":\"Lomé\",\"lines\":[{\"materialId\":" + mat + ",\"quantity\":1}]}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.lines[0].unitPrice").value(5000.00));
+    }
+
+    @Test
     void templatesArePaginatedAndSoftDeleted() throws Exception {
         long mat = materialWithPrices("sac", "sac", "4800", "5000", "5200");
         String tag = "tpl-" + uid();
