@@ -48,6 +48,9 @@ public class PriceObservation {
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime validatedAt;
+    /** Verrou optimiste : une validation et un rejet simultanes -> le second echoue (HTTP 409). */
+    @Version
+    private Long version;
 
     public PriceObservation(Long materialId, Long supplierId, String locality, Long saleUnitId, BigDecimal unitPrice,
                             LocalDate observedOn, SourceType sourceType, String characteristics, String sourceReference) {

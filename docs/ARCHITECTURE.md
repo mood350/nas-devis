@@ -75,7 +75,7 @@ Aucun taux n'est jamais supposé. Un taux (`tax_rates`) doit être créé puis v
 ## Snapshots et ACID
 - `quote_lines` copie désignation, unité, prix, confiance et justification du prix, taxe ; `quotes` copie l'identité de l'entreprise. Un changement de catalogue, de prix, de taux ou de configuration ne modifie jamais un devis existant ; le re-calcul n'a lieu que sur demande explicite (`/reprice`) et uniquement sur un brouillon.
 - Chaque cas d'usage de `QuoteService` = une transaction : création du devis, de ses lignes, de sa ventilation fiscale, de l'historique et du numéro sont atomiques (rollback complet en cas d'échec).
-- Numéro `DEV-AAAA-000123` dérivé de l'identifiant (identity) dans la transaction de création ; unicité garantie par contrainte SQL.
+- Numéro `DEV-AAAA-000123` dérivé de l'identifiant (identity) dans la transaction de création (l'année est celle de la création du brouillon, pas de l'émission) ; unicité garantie par contrainte SQL.
 - Concurrence : `@Version` sur `quotes` → HTTP 409 en cas de modification concurrente.
 - Les exports PDF/DOCX ne s'exécutent pas dans une transaction : le devis est lu dans une transaction `readOnly` courte, puis rendu hors transaction.
 - Contraintes SQL : `CHECK` (quantités, prix, pourcentages, statuts), `UNIQUE`, clés étrangères, index de recherche.

@@ -4,7 +4,12 @@ import com.jayway.jsonpath.JsonPath;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import com.nasimmobilier.devis.pricing.domain.PriceObservationRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,6 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class QuoteFlowTest {
 
     @Autowired MockMvc mvc;
+    @Autowired PriceObservationRepository observationRepository;
+    @Autowired JdbcTemplate jdbc;
 
     // ---------- helpers ----------
 
@@ -269,6 +276,42 @@ class QuoteFlowTest {
         mvc.perform(post("/api/quotes").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"clientName\":\"K\",\"projectTitle\":\"P\",\"siteLocation\":\"Lomé\",\"lines\":[{\"materialId\":" + mat + ",\"quantity\":1}]}"))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.lines[0].unitPrice").value(5000.00));
+    }
+
+    @Test
+    void concurrentValidateAndRejectOfTheSameObservationCannotBothSucceed() throws Exception {
+        long mat = materialWithPrices("sac", "sac", "4800", "5000", "5200");
+        long sup = id(create("/api/suppliers", "{\"name\":\"V-" + uid() + "\"}"));
+        long obs = observe(mat, "" + sup, unitId("sac"), "5100", false);
+        // deux lectures simultanees de la meme observation en attente
+        var first = observationRepository.findById(obs).orElseThrow();
+        var second = observationRepository.findById(obs).orElseThrow();
+        first.validate();
+        observationRepository.saveAndFlush(first);
+        second.reject();
+        assertThrows(OptimisticLockingFailureException.class, () -> observationRepository.saveAndFlush(second));
+        assertEquals("VALIDATED", jdbc.queryForObject("select status from price_observations where id = ?", String.class, obs));
+    }
+
+    @Test
+    void legacyQuotesGetTheirNetAndTaxTotalsBackfilled() throws Exception {
+        // forme d'un devis cree avant V3 : net_ht et tax_total a 0 par defaut, total_ttc = ancien total avec TVA
+        jdbc.update("insert into quotes (quote_number, client_name, project_title, status, issue_date, validity_days, discount_percent,"
+                + " subtotal, discount_amount, total_ttc, version, created_at) values ('LEGACY-" + uid() + "', 'Ancien', 'Ancien', 'ISSUED', current_date, 30, 10,"
+                + " 10000.00, 1000.00, 10620.00, 0, current_timestamp)");
+        // un devis recent (net_ht > 0) ne doit jamais etre touche
+        jdbc.update("insert into quotes (quote_number, client_name, project_title, status, issue_date, validity_days, discount_percent,"
+                + " subtotal, discount_amount, net_ht, tax_total, total_ttc, version, created_at) values ('RECENT-" + uid() + "', 'Recent', 'Recent', 'ISSUED', current_date, 30, 0,"
+                + " 5000.00, 0.00, 5000.00, 900.00, 5900.00, 0, current_timestamp)");
+        try (var c = jdbc.getDataSource().getConnection()) {
+            ScriptUtils.executeSqlScript(c, new ClassPathResource("db/migration/V6__backfill_legacy_quote_totals.sql"));
+        }
+        var legacy = jdbc.queryForMap("select net_ht, tax_total from quotes where client_name = 'Ancien' order by id desc limit 1");
+        assertEquals(0, new java.math.BigDecimal("9000.00").compareTo((java.math.BigDecimal) legacy.get("net_ht")));
+        assertEquals(0, new java.math.BigDecimal("1620.00").compareTo((java.math.BigDecimal) legacy.get("tax_total")));
+        var recent = jdbc.queryForMap("select net_ht, tax_total from quotes where client_name = 'Recent' order by id desc limit 1");
+        assertEquals(0, new java.math.BigDecimal("5000.00").compareTo((java.math.BigDecimal) recent.get("net_ht")));
+        assertEquals(0, new java.math.BigDecimal("900.00").compareTo((java.math.BigDecimal) recent.get("tax_total")));
     }
 
     @Test
