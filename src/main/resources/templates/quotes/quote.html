@@ -81,21 +81,21 @@
         <td th:text="${l.order}">1</td>
         <td th:text="${l.designation}">Ciment</td>
         <td th:text="${l.unit}">sac</td>
-        <td class="r" th:text="${#numbers.formatDecimal(l.quantity, 1, 'WHITESPACE', 2, 'COMMA')}">10,00</td>
-        <td class="r" th:text="${#numbers.formatDecimal(l.unitPrice, 1, 'WHITESPACE', 0, 'COMMA')}">6 500</td>
-        <td class="r" th:text="${#numbers.formatDecimal(l.lineTotal, 1, 'WHITESPACE', 0, 'COMMA')}">65 000</td>
+        <td class="r" th:text="${#numbers.formatDecimal(l.quantity, 1, 'WHITESPACE', 3, 'COMMA')}">10,000</td>
+        <td class="r" th:text="${#numbers.formatDecimal(l.unitPrice, 1, 'WHITESPACE', 2, 'COMMA')}">6 500</td>
+        <td class="r" th:text="${#numbers.formatDecimal(l.lineTotal, 1, 'WHITESPACE', 2, 'COMMA')}">65 000</td>
     </tr>
     </tbody>
 </table>
 
 <table class="totals">
-    <tr><td>Sous-total HT</td><td class="r" th:text="${#numbers.formatDecimal(quote.subtotal, 1, 'WHITESPACE', 0, 'COMMA')}">0</td></tr>
-    <tr th:if="${quote.discountAmount.signum() > 0}"><td th:text="'Remise (' + ${quote.discountPercent} + ' %)'">Remise</td><td class="r" th:text="'-' + ${#numbers.formatDecimal(quote.discountAmount, 1, 'WHITESPACE', 0, 'COMMA')}">0</td></tr>
-    <tr th:if="${quote.transportCost.signum() > 0}"><td>Frais de transport HT</td><td class="r" th:text="${#numbers.formatDecimal(quote.transportCost, 1, 'WHITESPACE', 0, 'COMMA')}">0</td></tr>
-    <tr><td><b>Total net HT</b></td><td class="r"><b th:text="${#numbers.formatDecimal(quote.netHt, 1, 'WHITESPACE', 0, 'COMMA')}">0</b></td></tr>
-    <tr th:each="t : ${quote.taxes}"><td th:text="${t.label} + ' (' + ${t.rate} + ' %) sur ' + ${#numbers.formatDecimal(t.base, 1, 'WHITESPACE', 0, 'COMMA')}">Taxe</td><td class="r" th:text="${#numbers.formatDecimal(t.amount, 1, 'WHITESPACE', 0, 'COMMA')}">0</td></tr>
+    <tr><td>Sous-total HT</td><td class="r" th:text="${#numbers.formatDecimal(quote.subtotal, 1, 'WHITESPACE', 2, 'COMMA')}">0</td></tr>
+    <tr th:if="${quote.discountAmount.signum() > 0}"><td th:text="'Remise (' + ${quote.discountPercent} + ' %)'">Remise</td><td class="r" th:text="'-' + ${#numbers.formatDecimal(quote.discountAmount, 1, 'WHITESPACE', 2, 'COMMA')}">0</td></tr>
+    <tr th:if="${quote.transportCost.signum() > 0}"><td>Frais de transport HT</td><td class="r" th:text="${#numbers.formatDecimal(quote.transportCost, 1, 'WHITESPACE', 2, 'COMMA')}">0</td></tr>
+    <tr><td><b>Total net HT</b></td><td class="r"><b th:text="${#numbers.formatDecimal(quote.netHt, 1, 'WHITESPACE', 2, 'COMMA')}">0</b></td></tr>
+    <tr th:each="t : ${quote.taxes}"><td th:text="${t.label} + ' (' + ${t.rate} + ' %) sur ' + ${#numbers.formatDecimal(t.base, 1, 'WHITESPACE', 2, 'COMMA')}">Taxe</td><td class="r" th:text="${#numbers.formatDecimal(t.amount, 1, 'WHITESPACE', 2, 'COMMA')}">0</td></tr>
     <tr th:if="${quote.taxes.isEmpty()}"><td class="muted">Aucune taxe appliquée</td><td></td></tr>
-    <tr class="grand"><td>TOTAL GÉNÉRAL TTC</td><td class="r" th:text="${#numbers.formatDecimal(quote.totalTtc, 1, 'WHITESPACE', 0, 'COMMA')} + ' FCFA'">0 FCFA</td></tr>
+    <tr class="grand"><td>TOTAL GÉNÉRAL TTC</td><td class="r" th:text="${#numbers.formatDecimal(quote.totalTtc, 1, 'WHITESPACE', 2, 'COMMA')} + ' FCFA'">0 FCFA</td></tr>
 </table>
 
 <table class="sign">

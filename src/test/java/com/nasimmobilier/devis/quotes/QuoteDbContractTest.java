@@ -121,7 +121,7 @@ abstract class QuoteDbContractTest {
             assertThrows(ObjectOptimisticLockingFailureException.class, () -> new TransactionTemplate(txManager).executeWithoutResult(s -> {
                 Quote mine = quoteRepository.findWithLinesById(id).orElseThrow();
                 try { // un autre utilisateur modifie et valide entre-temps
-                    other.submit(() -> quotes.changeQuantity(id, lineId, new QuoteService.QuantityRequest(new BigDecimal("9")))).get();
+                    other.submit(() -> quotes.changeQuantity(id, lineId, new QuoteService.QuantityRequest(new BigDecimal("9")), null)).get();
                 } catch (Exception e) {
                     throw new IllegalStateException(e);
                 }

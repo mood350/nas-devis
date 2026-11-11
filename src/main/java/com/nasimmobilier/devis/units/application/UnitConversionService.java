@@ -34,6 +34,8 @@ public class UnitConversionService {
 
     public ConversionResponse create(ConversionRequest r) {
         if (r.fromUnitId().equals(r.toUnitId())) throw new BusinessRuleException("Les deux unites doivent differer");
+        if (repository.findByFromUnitIdAndToUnitId(r.toUnitId(), r.fromUnitId()).isPresent())
+            throw new BusinessRuleException("Conversion inverse deja declaree : le sens inverse est deduit, ne pas le declarer deux fois");
         units.find(r.fromUnitId());
         units.find(r.toUnitId());
         UnitConversion c = new UnitConversion();

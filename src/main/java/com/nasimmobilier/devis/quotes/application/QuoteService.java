@@ -119,27 +119,29 @@ public class QuoteService {
     }
 
     /** Modifie l'en-tete d'un brouillon (client, chantier, validite, remise, transport) et recalcule. */
-    public QuoteResponse updateHeader(Long id, QuoteRequest r) {
-        Quote q = find(id);
+    public QuoteResponse updateHeader(Long id, QuoteRequest r, Long expectedVersion) {
+        Quote q = find(id, expectedVersion);
+        boolean siteChanged = !q.getSiteLocation().equals(r.siteLocation());
         q.updateHeader(r.clientName(), r.clientAddress(), r.projectTitle(), r.siteLocation(), validity(r), discount(r),
                 transport(r), tax(r.transportTaxCode()));
+        if (siteChanged) repriceCatalogLines(q); // les prix dependent de la localite ; PRICE_UNAVAILABLE annule tout
         return flushAndRespond(q);
     }
 
-    public QuoteResponse addLine(Long id, LineRequest l, String defaultTaxCode) {
-        Quote q = find(id);
+    public QuoteResponse addLine(Long id, LineRequest l, String defaultTaxCode, Long expectedVersion) {
+        Quote q = find(id, expectedVersion);
         q.addLine(spec(q.getSiteLocation(), l, defaultTaxCode));
         return flushAndRespond(q);
     }
 
-    public QuoteResponse changeQuantity(Long id, Long lineId, QuantityRequest r) {
-        Quote q = find(id);
+    public QuoteResponse changeQuantity(Long id, Long lineId, QuantityRequest r, Long expectedVersion) {
+        Quote q = find(id, expectedVersion);
         q.changeQuantity(lineId, r.quantity());
         return flushAndRespond(q);
     }
 
-    public QuoteResponse removeLine(Long id, Long lineId) {
-        Quote q = find(id);
+    public QuoteResponse removeLine(Long id, Long lineId, Long expectedVersion) {
+        Quote q = find(id, expectedVersion);
         q.removeLine(lineId);
         return flushAndRespond(q);
     }
@@ -147,25 +149,34 @@ public class QuoteService {
     /** Re-selectionne les prix des lignes issues du catalogue (les prix manuels sont conserves). Tout ou rien. */
     public QuoteResponse reprice(Long id) {
         Quote q = find(id);
+        repriceCatalogLines(q);
+        return flushAndRespond(q);
+    }
+
+    private void repriceCatalogLines(Quote q) {
         for (QuoteLine l : List.copyOf(q.getLines())) {
             if (l.getMaterialId() == null || !"CATALOG".equals(l.getPriceSource())) continue;
             Resolved r = resolve(materials.find(l.getMaterialId()), q.getSiteLocation());
             q.repriceLine(l.getId(), r.price(), r.info());
         }
-        return flushAndRespond(q);
     }
 
-    /** version (optionnelle) : celle que l'utilisateur a vue ; si le brouillon a change depuis, HTTP 409. */
+    /** expectedVersion (optionnelle, sur toutes les modifications) : celle que l'utilisateur a vue ; sinon HTTP 409. */
     public QuoteResponse issue(Long id, Long expectedVersion) {
-        Quote q = find(id);
-        if (expectedVersion != null && !expectedVersion.equals(q.getVersion()))
-            throw new ObjectOptimisticLockingFailureException(Quote.class, id);
+        Quote q = find(id, expectedVersion);
         q.issue();
         return flushAndRespond(q);
     }
 
     public void delete(Long id) {
         repository.findById(id).orElseThrow(() -> new NotFoundException("Devis", id)).softDelete();
+    }
+
+    private Quote find(Long id, Long expectedVersion) {
+        Quote q = find(id);
+        if (expectedVersion != null && !expectedVersion.equals(q.getVersion()))
+            throw new ObjectOptimisticLockingFailureException(Quote.class, id);
+        return q;
     }
 
     private Quote find(Long id) {

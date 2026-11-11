@@ -75,22 +75,22 @@ public class DocxQuoteRenderer {
             setCell(row.getCell(1), l.designation(), false);
             setCell(row.getCell(2), l.unit(), false);
             setCell(row.getCell(3), num(l.quantity(), 3), false);
-            setCell(row.getCell(4), num(l.unitPrice(), 0), false);
-            setCell(row.getCell(5), num(l.lineTotal(), 0), false);
+            setCell(row.getCell(4), num(l.unitPrice(), 2), false);
+            setCell(row.getCell(5), num(l.lineTotal(), 2), false);
         }
     }
 
     private void totals(XWPFDocument doc, QuoteResponse q) {
-        paragraph(doc, "Sous-total HT : " + num(q.subtotal(), 0) + " FCFA", false, 11);
+        paragraph(doc, "Sous-total HT : " + num(q.subtotal(), 2) + " FCFA", false, 11);
         if (q.discountAmount().signum() > 0)
-            paragraph(doc, "Remise (" + q.discountPercent() + " %) : -" + num(q.discountAmount(), 0) + " FCFA", false, 11);
+            paragraph(doc, "Remise (" + q.discountPercent() + " %) : -" + num(q.discountAmount(), 2) + " FCFA", false, 11);
         if (q.transportCost().signum() > 0)
-            paragraph(doc, "Frais de transport HT : " + num(q.transportCost(), 0) + " FCFA", false, 11);
-        paragraph(doc, "Total net HT : " + num(q.netHt(), 0) + " FCFA", true, 11);
+            paragraph(doc, "Frais de transport HT : " + num(q.transportCost(), 2) + " FCFA", false, 11);
+        paragraph(doc, "Total net HT : " + num(q.netHt(), 2) + " FCFA", true, 11);
         if (q.taxes().isEmpty()) paragraph(doc, "Aucune taxe appliquée.", false, 11);
         for (TaxResponse t : q.taxes())
-            paragraph(doc, t.label() + " (" + t.rate() + " %) sur " + num(t.base(), 0) + " : " + num(t.amount(), 0) + " FCFA", false, 11);
-        paragraph(doc, "TOTAL GÉNÉRAL TTC : " + num(q.totalTtc(), 0) + " FCFA", true, 13);
+            paragraph(doc, t.label() + " (" + t.rate() + " %) sur " + num(t.base(), 2) + " : " + num(t.amount(), 2) + " FCFA", false, 11);
+        paragraph(doc, "TOTAL GÉNÉRAL TTC : " + num(q.totalTtc(), 2) + " FCFA", true, 13);
     }
 
     private void signatures(XWPFDocument doc, CompanyInfo c) {

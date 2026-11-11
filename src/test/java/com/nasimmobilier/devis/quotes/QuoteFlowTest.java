@@ -315,6 +315,74 @@ class QuoteFlowTest {
     }
 
     @Test
+    void printedAmountsMatchTheStoredOnes() throws Exception {
+        // 3 x 7599,50 = 22798,50 : un arrondi a l'unite afficherait 7 600 / 22 798 (la multiplication ne tomberait pas juste)
+        String q = create("/api/quotes", "{\"clientName\":\"K\",\"projectTitle\":\"P\",\"siteLocation\":\"Lomé\",\"lines\":["
+                + "{\"designation\":\"Sable\",\"unit\":\"m3\",\"quantity\":3,\"unitPrice\":7599.50},"
+                + "{\"designation\":\"Gravier\",\"unit\":\"m3\",\"quantity\":0.125,\"unitPrice\":1000}]}");
+        long qid = id(q);
+        byte[] pdf = mvc.perform(get("/api/quotes/" + qid + "/pdf")).andReturn().getResponse().getContentAsByteArray();
+        try (PDDocument doc = PDDocument.load(pdf)) {
+            String text = new PDFTextStripper().getText(doc);
+            for (String expected : new String[]{"7 599,50", "22 798,50", "0,125", "125,00"})
+                assertTrue(text.contains(expected), "PDF sans : " + expected);
+        }
+        byte[] docx = mvc.perform(get("/api/quotes/" + qid + "/docx")).andReturn().getResponse().getContentAsByteArray();
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(docx))) {
+            String row = doc.getTables().get(1).getRow(1).getTableCells().stream().map(c -> c.getText()).reduce("", (a, b) -> a + "|" + b);
+            assertTrue(row.contains("7 599,50") && row.contains("22 798,50"), row);
+        }
+    }
+
+    @Test
+    void inverseUnitConversionCannotBeDeclaredTwice() throws Exception {
+        long u1 = id(create("/api/units", "{\"code\":\"a" + uid() + "\",\"name\":\"A\"}"));
+        long u2 = id(create("/api/units", "{\"code\":\"b" + uid() + "\",\"name\":\"B\"}"));
+        create("/api/unit-conversions", "{\"fromUnitId\":" + u1 + ",\"toUnitId\":" + u2 + ",\"factor\":1000}");
+        mvc.perform(post("/api/unit-conversions").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"fromUnitId\":" + u2 + ",\"toUnitId\":" + u1 + ",\"factor\":5}")).andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void everyDraftEditChecksTheVersionTheUserSaw() throws Exception {
+        long mat = materialWithPrices("sac", "sac", "4800", "5000", "5200");
+        String q = quote(mat, "");
+        long qid = id(q);
+        long line0 = ((Number) JsonPath.read(q, "$.lines[0].id")).longValue();
+        int stale = ((Number) JsonPath.read(q, "$.version")).intValue();
+        mvc.perform(put("/api/quotes/" + qid + "/lines/" + line0).contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":20}")).andExpect(status().isOk());
+        String header = "{\"clientName\":\"X\",\"projectTitle\":\"Y\",\"siteLocation\":\"Lomé\"}";
+        mvc.perform(put("/api/quotes/" + qid + "?version=" + stale).contentType(MediaType.APPLICATION_JSON).content(header)).andExpect(status().isConflict());
+        mvc.perform(post("/api/quotes/" + qid + "/lines?version=" + stale).contentType(MediaType.APPLICATION_JSON).content(MANUAL_LINE)).andExpect(status().isConflict());
+        mvc.perform(put("/api/quotes/" + qid + "/lines/" + line0 + "?version=" + stale).contentType(MediaType.APPLICATION_JSON).content("{\"quantity\":1}")).andExpect(status().isConflict());
+        mvc.perform(delete("/api/quotes/" + qid + "/lines/" + line0 + "?version=" + stale)).andExpect(status().isConflict());
+        int current = ((Number) JsonPath.read(json("/api/quotes/" + qid), "$.version")).intValue();
+        mvc.perform(put("/api/quotes/" + qid + "?version=" + current).contentType(MediaType.APPLICATION_JSON).content(header)).andExpect(status().isOk());
+    }
+
+    @Test
+    void changingTheSiteLocationRepricesCatalogLinesOrFailsAsAWhole() throws Exception {
+        long mat = materialWithPrices("sac", "sac", "4800", "5000", "5200"); // prix a Lomé seulement
+        String q = quote(mat, "");
+        long qid = id(q);
+        String toKara = "{\"clientName\":\"K\",\"projectTitle\":\"P\",\"siteLocation\":\"Kara\"}";
+        // aucun prix a Kara : refus, le devis reste a Lomé avec ses prix
+        mvc.perform(put("/api/quotes/" + qid).contentType(MediaType.APPLICATION_JSON).content(toKara)).andExpect(status().isUnprocessableContent());
+        mvc.perform(get("/api/quotes/" + qid)).andExpect(jsonPath("$.siteLocation").value("Lomé")).andExpect(jsonPath("$.lines[0].unitPrice").value(5000.00));
+        // des prix existent a Kara : les lignes catalogue sont reprixees (la ligne manuelle reste)
+        long sA = id(create("/api/suppliers", "{\"name\":\"KA-" + uid() + "\"}"));
+        long sB = id(create("/api/suppliers", "{\"name\":\"KB-" + uid() + "\"}"));
+        for (String[] o : new String[][]{{"6000", "" + sA}, {"6200", "" + sB}}) {
+            long obs = id(create("/api/price-observations", "{\"materialId\":" + mat + ",\"supplierId\":" + o[1] + ",\"locality\":\"Kara\",\"saleUnitId\":"
+                    + unitId("sac") + ",\"unitPrice\":" + o[0] + ",\"characteristics\":\"C1\",\"sourceReference\":\"devis\"}"));
+            ok("/api/price-observations/" + obs + "/validate", "");
+        }
+        mvc.perform(put("/api/quotes/" + qid).contentType(MediaType.APPLICATION_JSON).content(toKara)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.siteLocation").value("Kara")).andExpect(jsonPath("$.lines[0].unitPrice").value(6100.00))
+                .andExpect(jsonPath("$.lines[1].unitPrice").value(5000.00));
+    }
+
+    @Test
     void templatesArePaginatedAndSoftDeleted() throws Exception {
         long mat = materialWithPrices("sac", "sac", "4800", "5000", "5200");
         String tag = "tpl-" + uid();
