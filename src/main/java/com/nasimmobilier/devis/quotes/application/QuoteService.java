@@ -122,8 +122,13 @@ public class QuoteService {
     public QuoteResponse updateHeader(Long id, QuoteRequest r, Long expectedVersion) {
         Quote q = find(id, expectedVersion);
         boolean siteChanged = !q.getSiteLocation().equals(r.siteLocation());
-        q.updateHeader(r.clientName(), r.clientAddress(), r.projectTitle(), r.siteLocation(), validity(r), discount(r),
-                transport(r), tax(r.transportTaxCode()));
+        // champ absent = valeur actuelle conservee (PUT partiel) ; transportTaxCode "" = retirer la taxe
+        Quote.Tax transportTax = r.transportTaxCode() != null ? tax(r.transportTaxCode())
+                : new Quote.Tax(q.getTransportTaxCode(), q.getTransportTaxLabel(), q.getTransportTaxRate());
+        q.updateHeader(r.clientName(), r.clientAddress() != null ? r.clientAddress() : q.getClientAddress(), r.projectTitle(),
+                r.siteLocation(), r.validityDays() != null ? r.validityDays() : q.getValidityDays(),
+                r.discountPercent() != null ? discount(r) : q.getDiscountPercent(),
+                r.transportCost() != null ? r.transportCost() : q.getTransportCost(), transportTax);
         if (siteChanged) repriceCatalogLines(q); // les prix dependent de la localite ; PRICE_UNAVAILABLE annule tout
         return flushAndRespond(q);
     }

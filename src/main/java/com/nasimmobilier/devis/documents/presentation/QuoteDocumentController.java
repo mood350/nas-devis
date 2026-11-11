@@ -1,6 +1,8 @@
 package com.nasimmobilier.devis.documents.presentation;
 
-import com.nasimmobilier.devis.documents.application.QuoteDocumentService;
+import com.nasimmobilier.devis.documents.infrastructure.DocxQuoteRenderer;
+import com.nasimmobilier.devis.documents.infrastructure.PdfQuoteRenderer;
+import com.nasimmobilier.devis.quotes.application.QuoteService;
 import com.nasimmobilier.devis.quotes.application.QuoteService.QuoteResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,15 +26,19 @@ public class QuoteDocumentController {
     private static final MediaType DOCX = MediaType.parseMediaType(
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
-    private final QuoteDocumentService service;
+    // Volontairement sans @Transactional : QuoteService.get lit le devis dans sa propre transaction read-only,
+    // puis le rendu lourd s'execute sans connexion SQL ouverte.
+    private final QuoteService quotes;
+    private final PdfQuoteRenderer pdfRenderer;
+    private final DocxQuoteRenderer docxRenderer;
 
     @GetMapping(value = "/pdf", produces = MediaType.APPLICATION_PDF_VALUE)
     @Operation(summary = "Exporter le devis en PDF (A4)")
     @ApiResponse(responseCode = "200", description = "Fichier PDF")
     @ApiResponse(responseCode = "404", description = "Devis introuvable")
     public ResponseEntity<byte[]> pdf(@PathVariable Long id) {
-        QuoteResponse q = service.quote(id);
-        return file(service.pdf(q), MediaType.APPLICATION_PDF, name(q, "pdf"));
+        QuoteResponse q = quotes.get(id);
+        return file(pdfRenderer.render(q), MediaType.APPLICATION_PDF, name(q, "pdf"));
     }
 
     @GetMapping(value = "/docx", produces = "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
@@ -40,8 +46,8 @@ public class QuoteDocumentController {
     @ApiResponse(responseCode = "200", description = "Fichier Word")
     @ApiResponse(responseCode = "404", description = "Devis introuvable")
     public ResponseEntity<byte[]> docx(@PathVariable Long id) {
-        QuoteResponse q = service.quote(id);
-        return file(service.docx(q), DOCX, name(q, "docx"));
+        QuoteResponse q = quotes.get(id);
+        return file(docxRenderer.render(q), DOCX, name(q, "docx"));
     }
 
     private static String name(QuoteResponse q, String ext) {
