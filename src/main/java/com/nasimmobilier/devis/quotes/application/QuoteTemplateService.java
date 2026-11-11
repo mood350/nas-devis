@@ -41,7 +41,7 @@ public class QuoteTemplateService {
                                       @NotBlank @Size(max = 255) String siteLocation,
                                       @Min(1) @Max(365) Integer validityDays,
                                       @DecimalMin("0") @DecimalMax("100") BigDecimal discountPercent,
-                                      @DecimalMin("0") BigDecimal transportCost,
+                                      @DecimalMin("0") @Digits(integer = 13, fraction = 2) BigDecimal transportCost,
                                       @Size(max = 30) String transportTaxCode,
                                       @Size(max = 30) String taxCode) {}
 
