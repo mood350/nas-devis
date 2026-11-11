@@ -50,8 +50,9 @@ public class QuoteController {
     @Operation(summary = "Modifier l'en-tete d'un brouillon (les lignes ne sont pas touchees)")
     @ApiResponse(responseCode = "409", description = "Modification concurrente")
     @ApiResponse(responseCode = "422", description = "Devis emis : immuable")
-    public QuoteResponse update(@PathVariable Long id, @Valid @RequestBody QuoteRequest r) {
-        return service.updateHeader(id, r);
+    public QuoteResponse update(@PathVariable Long id, @Valid @RequestBody QuoteRequest r,
+                                @Parameter(description = "Version du devis vue par l'utilisateur ; 409 si le brouillon a change depuis") @RequestParam(required = false) Long version) {
+        return service.updateHeader(id, r, version);
     }
 
     @PostMapping("/{id}/lines")
@@ -59,23 +60,25 @@ public class QuoteController {
     @Operation(summary = "Ajouter une ligne a un brouillon")
     @ApiResponse(responseCode = "422", description = "Devis emis, PRICE_UNAVAILABLE, taux non valide")
     public QuoteResponse addLine(@PathVariable Long id, @Valid @RequestBody LineRequest l,
-                                 @Parameter(description = "Taxe par defaut si la ligne n'a pas de taxCode") @RequestParam(required = false) String defaultTaxCode) {
-        return service.addLine(id, l, defaultTaxCode);
+                                 @Parameter(description = "Taxe par defaut si la ligne n'a pas de taxCode") @RequestParam(required = false) String defaultTaxCode,
+                                 @Parameter(description = "Version du devis vue par l'utilisateur ; 409 si le brouillon a change depuis") @RequestParam(required = false) Long version) {
+        return service.addLine(id, l, defaultTaxCode, version);
     }
 
     @PutMapping("/{id}/lines/{lineId}")
     @Operation(summary = "Modifier la quantite d'une ligne d'un brouillon")
     @ApiResponse(responseCode = "404", description = "Devis ou ligne introuvable")
     @ApiResponse(responseCode = "422", description = "Devis emis")
-    public QuoteResponse changeQuantity(@PathVariable Long id, @PathVariable Long lineId, @Valid @RequestBody QuantityRequest r) {
-        return service.changeQuantity(id, lineId, r);
+    public QuoteResponse changeQuantity(@PathVariable Long id, @PathVariable Long lineId, @Valid @RequestBody QuantityRequest r,
+                                        @Parameter(description = "Version du devis vue par l'utilisateur ; 409 si le brouillon a change depuis") @RequestParam(required = false) Long version) {
+        return service.changeQuantity(id, lineId, r, version);
     }
 
     @DeleteMapping("/{id}/lines/{lineId}")
     @Operation(summary = "Supprimer une ligne d'un brouillon")
     @ApiResponse(responseCode = "422", description = "Devis emis")
-    public QuoteResponse removeLine(@PathVariable Long id, @PathVariable Long lineId) {
-        return service.removeLine(id, lineId);
+    public QuoteResponse removeLine(@PathVariable Long id, @PathVariable Long lineId, @Parameter(description = "Version du devis vue par l'utilisateur ; 409 si le brouillon a change depuis") @RequestParam(required = false) Long version) {
+        return service.removeLine(id, lineId, version);
     }
 
     @PostMapping("/{id}/reprice")
@@ -89,8 +92,7 @@ public class QuoteController {
     @Operation(summary = "Emettre un devis", description = "Le devis devient immuable. Refuse s'il est vide ou contient des prix DEMO.")
     @ApiResponse(responseCode = "409", description = "Modification concurrente")
     @ApiResponse(responseCode = "422", description = "Deja emis, vide ou prix de demonstration")
-    public QuoteResponse issue(@PathVariable Long id,
-                               @Parameter(description = "Version du devis vue par l'utilisateur ; 409 si le brouillon a change depuis") @RequestParam(required = false) Long version) {
+    public QuoteResponse issue(@PathVariable Long id, @Parameter(description = "Version du devis vue par l'utilisateur ; 409 si le brouillon a change depuis") @RequestParam(required = false) Long version) {
         return service.issue(id, version);
     }
 

@@ -113,7 +113,8 @@ Ordre : lignes → sous-total → remise (avant taxe) → transport (non remisé
 ## Devis
 La suppression d'un brouillon (`DELETE /quotes/{id}`) et celle d'un modèle sont **douces** : la ligne reste en base (`deleted_at`) avec ses lignes et son historique, mais n'apparaît plus dans l'API (404). Il n'existe pas de restauration par l'API. Le nom d'un modèle supprimé est suffixé pour être de nouveau utilisable.
 `DRAFT` : modifiable (en-tête, lignes, quantités, `reprice`). `ISSUED` : immuable. Historique des statuts dans `history`.
-`reprice` re-sélectionne les prix des lignes catalogue (prix manuels conservés) ; sans cet appel, un brouillon garde ses prix figés.
+`reprice` re-sélectionne les prix des lignes catalogue (prix manuels conservés) ; sans cet appel, un brouillon garde ses prix figés. Changer le chantier (`siteLocation`) d'un brouillon relance cette sélection automatiquement (tout ou rien : `PRICE_UNAVAILABLE` annule la modification).
+Toute modification d'un brouillon et l'émission acceptent `?version=` (la `version` lue dans le devis) : `409` si le devis a changé depuis. Sans ce paramètre, aucun contrôle.
 
 ## Dépendances ajoutées (par rapport au POM initial)
 | Dépendance | Raison |
